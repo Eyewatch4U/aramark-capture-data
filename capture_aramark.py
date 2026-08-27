@@ -276,29 +276,45 @@ async def capture_snapshot() -> dict:
 
 
 def post_to_worker(snapshot: dict) -> int:
-    """POSTea el JSON completo del snapshot al endpoint /ingest del Worker."""
+    """POSTea el JSON completo del snapshot al endpoint /ingest del Worker.
+
+    El zone del Worker Aramark tiene Bot Fight Mode de Cloudflare activo: rechaza
+    con 403 error 1010 a clientes cuyo fingerprint TLS (JA3) no es el de un
+    navegador real. Un User-Agent de Chrome NO alcanza (el bloqueo es a nivel
+    TLS, no de headers). Por eso usamos curl_cffi con impersonate="chrome":
+    replica el handshake TLS de Chrome y pasa Bot Fight Mode.
+
+    Fallback: si curl_cffi no está disponible, cae a urllib (que será rechazado
+    por 1010 si Bot Fight Mode sigue activo; el error queda explícito en el log).
+    """
     print("→ POST a Cloudflare Worker (/ingest)...", flush=True)
     payload = json.dumps(snapshot).encode("utf-8")
     print(f"  payload: {len(payload)} bytes", flush=True)
+    headers = {"Content-Type": "application/json", "x-sync-token": SYNC_TOKEN}
+
+    # ── Camino principal: curl_cffi (TLS de Chrome, pasa Bot Fight Mode) ──────
+    try:
+        from curl_cffi import requests as cffi
+        resp = cffi.post(
+            WORKER_INGEST_URL,
+            data=payload,
+            headers=headers,
+            impersonate="chrome",
+            timeout=120,
+        )
+        body = (resp.text or "")[:400]
+        print(f"✓ Worker respondió {resp.status_code}: {body}", flush=True)
+        if resp.status_code not in (200, 202):
+            # 422 = capture vacío (Worker protege 'latest_aramark'); 401 = token;
+            # 403/1010 = Bot Fight Mode todavía bloqueando.
+            raise RuntimeError(f"Worker devolvió {resp.status_code}: {body}")
+        return resp.status_code
+    except ImportError:
+        print("  ⚠ curl_cffi no instalado; fallback a urllib (puede dar 1010)...", flush=True)
+
+    # ── Fallback: urllib (sin impersonación) ─────────────────────────────────
     req = urllib.request.Request(
-        WORKER_INGEST_URL,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-sync-token": SYNC_TOKEN,
-            # UA/Accept de navegador: el zone del Worker tiene Browser Integrity
-            # Check de Cloudflare, que rechaza el UA por defecto de urllib con
-            # 403 error 1010 ("banned based on browser signature") ANTES de que
-            # el request llegue al Worker. Con estos headers pasa el BIC.
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        },
-        method="POST",
+        WORKER_INGEST_URL, data=payload, headers=headers, method="POST"
     )
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
@@ -308,7 +324,6 @@ def post_to_worker(snapshot: dict) -> int:
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")[:400]
         print(f"✗ Worker respondió {e.code}: {body}", flush=True)
-        # 422 = capture vacío (el Worker protege 'latest_aramark'); 401 = token mal.
         raise RuntimeError(f"Worker devolvió {e.code}: {body}")
 
 
