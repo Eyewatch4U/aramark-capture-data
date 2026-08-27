@@ -35,7 +35,7 @@ ARAMARK · Benchmark Chile · Benchmark Internacional · Industria Minera
 
 ## Disparo
 
-- `schedule`: 1 vez por día (12:00 UTC ≈ 08:00/09:00 Chile según DST).
+- `schedule`: cada 30 min, en `:05` y `:35` (cron `5,35 * * * *`).
 - `workflow_dispatch`: manual, o vía cron-job.org para mayor frecuencia.
 
 ## Debug

@@ -20,13 +20,11 @@ name: Capture Aramark
 
 on:
   schedule:
-    # ── HORA CHILE ────────────────────────────────────────────────────────────
-    # GitHub Actions corre SIEMPRE en UTC y NO ajusta por DST.
-    # 12:00 UTC  =  08:00 en Chile (CLT, invierno, UTC-4, ~Abr–Sep)
-    #            =  09:00 en Chile (CLST, verano, UTC-3, ~Sep–Abr)
-    # Para fijar 08:00 todo el año, agregá un segundo cron y comentá según estación,
-    # o pasá a varias corridas diarias (p.ej. '0 11,15,19 * * *').
-    - cron: '0 12 * * *'
+    # Cada 30 min, en el minuto :05 y :35 de cada hora (UTC, pero al ser
+    # minuto-de-hora no depende de zona horaria ni DST: corre a esos minutos
+    # en cualquier huso). Off del :00/:30 a propósito, para esquivar la
+    # congestión del top-of-hour en los runners de GitHub.
+    - cron: '5,35 * * * *'
   workflow_dispatch:
 
 # Solo una ejecución a la vez (evita solapamientos).
