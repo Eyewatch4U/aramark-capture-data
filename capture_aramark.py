@@ -286,6 +286,17 @@ def post_to_worker(snapshot: dict) -> int:
         headers={
             "Content-Type": "application/json",
             "x-sync-token": SYNC_TOKEN,
+            # UA/Accept de navegador: el zone del Worker tiene Browser Integrity
+            # Check de Cloudflare, que rechaza el UA por defecto de urllib con
+            # 403 error 1010 ("banned based on browser signature") ANTES de que
+            # el request llegue al Worker. Con estos headers pasa el BIC.
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
         },
         method="POST",
     )
