@@ -1,0 +1,5 @@
+403 https://app.meltwater.com/report/public/[REDACTED]/snapshot
+200 https://app.meltwater.com/report/public/[REDACTED]/snapshot
+308 https://app.meltwater.com/p/shareable-reports/?[REDACTED]
+200 https://app.meltwater.com/p/shareable-reports?[REDACTED]
+200 https://app.meltwater.com/report/public/[REDACTED]/insight-pages/snapshot?[REDACTED]

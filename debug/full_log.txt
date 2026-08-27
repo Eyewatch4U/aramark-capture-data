@@ -1,0 +1,49 @@
+→ Navegando a Meltwater (Aramark)...
+  page.url = https://app.meltwater.com/report/public/[REDACTED]/snapshot
+  page.title = Generating
+→ Password gate detectado, enviando passcode...
+  Post-reload: Public Report
+✓ URL .gz detectada
+→ Esperando .gz (hasta 120s, sin recargas agresivas)...
+  señal=1171308  size=7669062B
+✓ Snapshot CON datos (señal=1171308).
+→ POST a Cloudflare Worker (/ingest)...
+  payload: 8276787 bytes
+✗ Worker respondió 403: error code: 1010
+
+
+✗ ERROR: Worker devolvió 403: error code: 1010
+
+Traceback (most recent call last):
+  File "/home/runner/work/aramark-capture-data/aramark-capture-data/capture_aramark.py", line 293, in post_to_worker
+    with urllib.request.urlopen(req, timeout=120) as resp:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/urllib/request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/urllib/request.py", line 525, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/urllib/request.py", line 634, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/urllib/request.py", line 563, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/urllib/request.py", line 643, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 403: Forbidden
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/aramark-capture-data/aramark-capture-data/capture_aramark.py", line 312, in main
+    status = post_to_worker(snapshot)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/aramark-capture-data/aramark-capture-data/capture_aramark.py", line 301, in post_to_worker
+    raise RuntimeError(f"Worker devolvió {e.code}: {body}")
+RuntimeError: Worker devolvió 403: error code: 1010
+
