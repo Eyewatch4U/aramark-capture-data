@@ -1,0 +1,123 @@
+name: Capture Aramark
+
+# Captura el snapshot de Meltwater (Aramark, 4 tabs) e INGESTA el JSON completo
+# al Cloudflare Worker del Monitor Aramark.
+#
+# Cadena:
+#   Actions (Playwright baja y valida el .gz en runner con navegador real)
+#     -> POST del JSON a aramarkmonitor.reports-dca.workers.dev/ingest
+#        con header x-sync-token
+#     -> Worker corre extractMeltwater() y escribe KV (latest_aramark)
+#     -> Dashboard
+#
+# Repo PUBLICO -> minutos de Actions ilimitados y gratis, y el `schedule`
+# nativo corre de forma confiable (en repos privados free GitHub throttlea).
+#
+# Disparo:
+#   - schedule: 1 vez por día (ver nota de hora Chile abajo).
+#   - workflow_dispatch: manual, o desde cron-job.org si querés más frecuencia:
+#       https://api.github.com/repos/Eyewatch4U/aramark-capture-data/actions/workflows/capture-aramark.yml/dispatches
+
+on:
+  schedule:
+    # ── HORA CHILE ────────────────────────────────────────────────────────────
+    # GitHub Actions corre SIEMPRE en UTC y NO ajusta por DST.
+    # 12:00 UTC  =  08:00 en Chile (CLT, invierno, UTC-4, ~Abr–Sep)
+    #            =  09:00 en Chile (CLST, verano, UTC-3, ~Sep–Abr)
+    # Para fijar 08:00 todo el año, agregá un segundo cron y comentá según estación,
+    # o pasá a varias corridas diarias (p.ej. '0 11,15,19 * * *').
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+# Solo una ejecución a la vez (evita solapamientos).
+concurrency:
+  group: aramark-capture
+  cancel-in-progress: false
+
+# contents: write para que el step de debug-on-failure pueda commitear el log.
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    name: Capturar e ingestar al Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar Playwright + Chromium
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium --with-deps
+
+      - name: Ejecutar capture
+        env:
+          MELTWATER_URL:      ${{ secrets.MELTWATER_URL }}
+          MELTWATER_PASSWORD: ${{ secrets.MELTWATER_PASSWORD }}
+          WORKER_INGEST_URL:  ${{ secrets.WORKER_INGEST_URL }}
+          SYNC_TOKEN:         ${{ secrets.SYNC_TOKEN }}
+          # Tuning opcional (tienen defaults razonables en el script):
+          MAX_WAIT_SECONDS:   '300'
+          JITTER_SECONDS:     '0'
+          # PROXY_URL: ${{ secrets.PROXY_URL }}   # (opcional, no requerido)
+        run: |
+          mkdir -p debug_output
+          python capture_aramark.py 2>&1 | tee debug_output/full_log.txt
+          exit ${PIPESTATUS[0]}
+
+      - name: Subir debug como artifact (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-${{ github.run_id }}
+          path: debug_output/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # ── Debug OPCIONAL commiteado al repo (on failure) ────────────────────────
+      # El repo es PUBLICO, así que ANTES de commitear se REDACTAN los query
+      # strings firmados (STS de la .gz) y cualquier snapshot_token, para no
+      # filtrar credenciales de corta vida. Se commitea solo el log/errores.
+      - name: Commit debug al repo (on failure, redactado)
+        if: failure()
+        run: |
+          if [ -d debug_output ]; then
+            echo "=== Preparando debug redactado ==="
+            rm -f debug_output/final.png            # binario pesado, no aporta al repo
+            # Truncar archivos grandes a 100 KB
+            for f in debug_output/*; do
+              if [ -f "$f" ] && [ "$(stat -c%s "$f")" -gt 100000 ]; then
+                head -c 100000 "$f" > "$f.trunc" && mv "$f.trunc" "$f"
+              fi
+            done
+            # REDACCIÓN de secretos de corta vida en los archivos de texto:
+            #  - query strings de URLs firmadas (?...) -> ?[REDACTED]
+            #  - snapshot_token=... -> snapshot_token=[REDACTED]
+            for f in debug_output/*.txt; do
+              [ -f "$f" ] || continue
+              sed -i -E 's/\?[^ ]*/?[REDACTED]/g; s/snapshot_token=[A-Za-z0-9_-]+/snapshot_token=[REDACTED]/g' "$f"
+            done
+
+            git config user.email "actions@github.com"
+            git config user.name  "github-actions[bot]"
+            rm -rf latest_failure
+            mkdir -p latest_failure
+            cp -r debug_output/*.txt latest_failure/ 2>/dev/null || true
+            git add latest_failure/
+            git commit -m "debug: failure $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "(nothing to commit)"
+            git pull --rebase origin main || true
+            git push || echo "(push falló; ver artifact)"
+            echo "=== Debug (redactado) en latest_failure/ ==="
+          fi
+
+      - name: Resultado
+        if: always()
+        run: echo "Ejecución finalizada a las $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
