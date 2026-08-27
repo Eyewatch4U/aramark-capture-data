@@ -35,7 +35,7 @@ ARAMARK · Benchmark Chile · Benchmark Internacional · Industria Minera
 
 ## Disparo
 
-- `schedule`: cada 30 min, en `:05` y `:35` (cron `5,35 * * * *`).
+- Disparo: `workflow_dispatch` vía cron-job.org cada 30 min (:05 y :35). Sin `schedule` nativo, para no duplicar con el cron externo.
 - `workflow_dispatch`: manual, o vía cron-job.org para mayor frecuencia.
 
 ## Debug

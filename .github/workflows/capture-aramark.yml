@@ -19,12 +19,11 @@ name: Capture Aramark
 #       https://api.github.com/repos/Eyewatch4U/aramark-capture-data/actions/workflows/capture-aramark.yml/dispatches
 
 on:
-  schedule:
-    # Cada 30 min, en el minuto :05 y :35 de cada hora (UTC, pero al ser
-    # minuto-de-hora no depende de zona horaria ni DST: corre a esos minutos
-    # en cualquier huso). Off del :00/:30 a propósito, para esquivar la
-    # congestión del top-of-hour en los runners de GitHub.
-    - cron: '5,35 * * * *'
+  # Disparo ÚNICO por cron-job.org (POST a workflow_dispatch) cada 30 min a
+  # :05 y :35. Se quitó el `schedule` nativo de GitHub para no duplicar
+  # corridas con el cron externo (mismo patrón que BROU/CMC/LATAM).
+  #   POST https://api.github.com/repos/Eyewatch4U/aramark-capture-data/actions/workflows/capture-aramark.yml/dispatches
+  #   body: {"ref":"main"}
   workflow_dispatch:
 
 # Solo una ejecución a la vez (evita solapamientos).
