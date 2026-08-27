@@ -1,0 +1,45 @@
+name: _debug capture
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  dbg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Instalar Playwright
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium --with-deps
+      - name: Capturar (no aborta)
+        continue-on-error: true
+        env:
+          MELTWATER_URL:      ${{ secrets.MELTWATER_URL }}
+          MELTWATER_PASSWORD: ${{ secrets.MELTWATER_PASSWORD }}
+          WORKER_INGEST_URL:  ${{ secrets.WORKER_INGEST_URL }}
+          SYNC_TOKEN:         ${{ secrets.SYNC_TOKEN }}
+          MAX_WAIT_SECONDS:   '120'
+        run: |
+          mkdir -p debug_output
+          python capture_aramark.py 2>&1 | tee debug_output/full_log.txt
+      - name: Commitear debug redactado (siempre)
+        if: always()
+        run: |
+          set +e
+          rm -f debug_output/final.png
+          for f in debug_output/*.txt; do
+            [ -f "$f" ] || continue
+            sed -i -E 's/\?[^ ]*/?[REDACTED]/g; s/(snapshot_token=)[A-Za-z0-9_-]+/\1[REDACTED]/g; s#(report/public/)[A-Za-z0-9]+#\1[REDACTED]#g' "$f"
+          done
+          rm -rf debug && mkdir -p debug
+          cp debug_output/*.txt debug/ 2>/dev/null
+          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+          git add -f debug/
+          git commit -m "debug run $(date -u +%H:%M:%SZ)"
+          git push
+          echo "push rc=$?"
