@@ -42,3 +42,10 @@ ARAMARK · Benchmark Chile · Benchmark Internacional · Industria Minera
 
 - En falla, el log queda como **artifact** privado del run.
 - Opcionalmente se commitea a `latest_failure/` **redactado** (sin tokens firmados).
+
+## Nota Cloudflare Bot Fight Mode
+
+El zone del Worker Aramark tiene Bot Fight Mode activo y rechaza clientes sin
+fingerprint TLS de navegador (403 error 1010). Por eso el POST `/ingest` usa
+`curl_cffi` con `impersonate="chrome"` (ver `requirements.txt`). Un User-Agent
+de navegador NO alcanza: el bloqueo es a nivel TLS (JA3), no de headers.
